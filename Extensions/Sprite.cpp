@@ -125,7 +125,7 @@ void* TFT_eSprite::getPointer(void)
 
 /***************************************************************************************
 ** Function name:           created
-** Description:             Returns true is sprite has been created
+** Description:             Returns true if sprite has been created
 ***************************************************************************************/
 bool TFT_eSprite::created(void)
 {
@@ -376,18 +376,18 @@ uint16_t TFT_eSprite::getPaletteColor(uint8_t index)
 ***************************************************************************************/
 void TFT_eSprite::deleteSprite(void)
 {
-  if (!_created ) return;
-
   if (_colorMap != nullptr)
   {
     free(_colorMap);
+	_colorMap = nullptr;
   }
 
-  free(_img8_1);
-
-  _img8 = nullptr;
-
-  _created = false;
+  if (_created)
+  {
+    free(_img8_1);
+    _img8 = nullptr;
+	_created = false;
+  }
 }
 
 
@@ -446,7 +446,7 @@ bool TFT_eSprite::pushRotated(int16_t angle, int32_t transp)
   int32_t yt = min_y - _tft->_ypivot;
   uint32_t xe = _dwidth << FP_SCALE;
   uint32_t ye = _dheight << FP_SCALE;
-  uint32_t tpcolor = transp;  // convert to unsigned
+  uint16_t tpcolor = transp;  // convert to unsigned
   if (_bpp == 4) tpcolor = _colorMap[transp & 0x0F];
   tpcolor = tpcolor>>8 | tpcolor<<8; // Working with swapped color bytes
   _tft->startWrite(); // Avoid transaction overhead for every tft pixel
@@ -462,7 +462,7 @@ bool TFT_eSprite::pushRotated(int16_t angle, int32_t transp)
 
     uint32_t pixel_count = 0;
     do {
-      uint32_t rp;
+      uint16_t rp;
       int32_t xp = xs >> FP_SCALE;
       int32_t yp = ys >> FP_SCALE;
       if (_bpp == 16) {rp = _img[xp + yp * _iwidth]; }
@@ -517,7 +517,7 @@ bool TFT_eSprite::pushRotated(TFT_eSprite *spr, int16_t angle, int32_t transp)
   int32_t yt = min_y - spr->_yPivot;
   uint32_t xe = _dwidth << FP_SCALE;
   uint32_t ye = _dheight << FP_SCALE;
-  uint32_t tpcolor = transp>>8 | transp<<8;  // convert to unsigned swapped bytes
+  uint16_t tpcolor = transp>>8 | transp<<8;  // convert to unsigned swapped bytes
 
   bool oldSwapBytes = spr->getSwapBytes();
   spr->setSwapBytes(false);
@@ -533,7 +533,7 @@ bool TFT_eSprite::pushRotated(TFT_eSprite *spr, int16_t angle, int32_t transp)
 
     uint32_t pixel_count = 0;
     do {
-      uint32_t rp;
+      uint16_t rp;
       int32_t xp = xs >> FP_SCALE;
       int32_t yp = ys >> FP_SCALE;
       if (_bpp == 16) rp = _img[xp + yp * _iwidth];
@@ -729,7 +729,7 @@ void TFT_eSprite::pushSprite(int32_t x, int32_t y, uint16_t transp)
 
 
 /***************************************************************************************
-** Function name:           pushSprite
+** Function name:           pushToSprite
 ** Description:             Push the sprite to another sprite at x, y
 ***************************************************************************************/
 // Note: The following sprite to sprite colour depths are currently supported:
@@ -739,33 +739,33 @@ void TFT_eSprite::pushSprite(int32_t x, int32_t y, uint16_t transp)
 //     4bpp  ->  4bpp (note: color translation depends on the 2 sprites pallet colors)
 //     1bpp  ->  1bpp (note: color translation depends on the 2 sprites bitmap colors)
 
-bool TFT_eSprite::pushSprite(TFT_eSprite *spr, int32_t x, int32_t y)
+bool TFT_eSprite::pushToSprite(TFT_eSprite *dspr, int32_t x, int32_t y)
 {
   if (!_created) return false;
-  if (!spr->created()) return false;
+  if (!dspr->created()) return false;
 
   // Check destination sprite compatibility
-  int8_t ds_bpp = spr->getColorDepth();
+  int8_t ds_bpp = dspr->getColorDepth();
   if (_bpp == 16 && ds_bpp != 16 && ds_bpp !=  8) return false;
   if (_bpp ==  8) return false;
   if (_bpp ==  4 && ds_bpp !=  4) return false;
   if (_bpp ==  1 && ds_bpp !=  1) return false;
 
-  bool oldSwapBytes = spr->getSwapBytes();
-  spr->setSwapBytes(false);
-  spr->pushImage(x, y, _dwidth, _dheight, _img );
-  spr->setSwapBytes(oldSwapBytes);
+  bool oldSwapBytes = dspr->getSwapBytes();
+  dspr->setSwapBytes(false);
+  dspr->pushImage(x, y, _dwidth, _dheight, _img );
+  dspr->setSwapBytes(oldSwapBytes);
 
   return true;
 }
 
 
 /***************************************************************************************
-** Function name:           pushSprite
+** Function name:           pushToSprite
 ** Description:             Push the sprite to another sprite at x, y with transparent colour
 ***************************************************************************************/
 /* >>>>>>  Using a transparent color is not supported at the moment  <<<<<<
-void TFT_eSprite::pushSprite(TFT_eSprite *spr, int32_t x, int32_t y, uint16_t transp)
+void TFT_eSprite::pushToSprite(TFT_eSprite *spr, int32_t x, int32_t y, uint16_t transp)
 {
   if (!_created) return;
 
@@ -843,9 +843,9 @@ bool TFT_eSprite::pushSprite(int32_t tx, int32_t ty, int32_t sx, int32_t sy, int
       _tft->pushImage(tx, ty, sw, sh, _img4 + (_iwidth>>1) * _ys, false, _colorMap );
     else // Render line by line
     {
-      uint32_t ds = _xs&1; // Odd x start pixel
+      int32_t ds = _xs&1; // Odd x start pixel
 
-      uint32_t de = 0;     // Odd x end pixel
+      int32_t de = 0;     // Odd x end pixel
       if ((sw > ds) && (_xe&1)) de = 1;
 
       uint32_t dm = 0;     // Midsection pixel count
@@ -877,7 +877,7 @@ bool TFT_eSprite::pushSprite(int32_t tx, int32_t ty, int32_t sx, int32_t sy, int
       _tft->setWindow(tx, ty, tx+sw-1, ty+sh-1);
       while (sh--)
       {
-        for (uint32_t dx = _xs; dx < _xs + sw; dx++) _tft->pushColor(readPixel(dx, _ys));
+        for (int32_t dx = _xs; dx < _xs + sw; dx++) _tft->pushColor(readPixel(dx, _ys));
         ty++;
         _ys++;
       }

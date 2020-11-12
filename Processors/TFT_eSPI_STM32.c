@@ -84,24 +84,42 @@ void TFT_eSPI::end_SDA_Read(void)
 ** Description:             Write a block of pixels of the same colour
 ***************************************************************************************/
 void TFT_eSPI::pushBlock(uint16_t color, uint32_t len){
-  // Loop unrolling improves speed dramtically graphics test  0.634s => 0.374s
-  while (len>31) {
-    // 32D macro writes 16 bits twice
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    len-=32;
-  }
-  while (len>7) {
-    tft_Write_32D(color); tft_Write_32D(color);
-    tft_Write_32D(color); tft_Write_32D(color);
-    len-=8;
-  }
+    // Loop unrolling improves speed dramtically graphics test  0.634s => 0.374s
+    while (len>31) {
+    #if !defined (SSD1963_DRIVER)
+      // 32D macro writes 16 bits twice
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+    #else
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+    #endif
+      len-=32;
+    }
+
+    while (len>7) {
+    #if !defined (SSD1963_DRIVER)
+      tft_Write_32D(color); tft_Write_32D(color);
+      tft_Write_32D(color); tft_Write_32D(color);
+    #else
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+      tft_Write_16(color); tft_Write_16(color); tft_Write_16(color); tft_Write_16(color);
+    #endif
+      len-=8;
+    }
+
   while (len--) {tft_Write_16(color);}
 }
 
@@ -419,18 +437,18 @@ void TFT_eSPI::pushPixelsDMA(uint16_t* image, uint32_t len)
 // This will clip and also swap bytes if setSwapBytes(true) was called by sketch
 void TFT_eSPI::pushImageDMA(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t* image, uint16_t* buffer)
 {
-  if ((x >= _width) || (y >= _height)) return;
+  if ((x >= _vpW) || (y >= _vpH)) return;
 
   int32_t dx = 0;
   int32_t dy = 0;
   int32_t dw = w;
   int32_t dh = h;
 
-  if (x < 0) { dw += x; dx = -x; x = 0; }
-  if (y < 0) { dh += y; dy = -y; y = 0; }
+  if (x < _vpX) { dx = _vpX - x; dw -= dx; x = _vpX; }
+  if (y < _vpY) { dy = _vpY - y; dh -= dy; y = _vpY; }
 
-  if ((x + dw) > _width ) dw = _width  - x;
-  if ((y + dh) > _height) dh = _height - y;
+  if ((x + dw) > _vpW ) dw = _vpW - x;
+  if ((y + dh) > _vpH ) dh = _vpH - y;
 
   if (dw < 1 || dh < 1) return;
 
